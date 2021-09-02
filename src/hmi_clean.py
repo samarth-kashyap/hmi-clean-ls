@@ -13,20 +13,6 @@ import time
 import os
 # }}} imports
 
-# {{{ argument parser
-parser = argparse.ArgumentParser()
-parser.add_argument('--job', help="Submit as a job (PBS)",
-                    action="store_true")
-parser.add_argument('--plot_fits', help="Plot fitted large scale features",
-                    action="store_true")
-parser.add_argument('--gnup', help="Argument for gnuParallel",
-                    default=1, type=int)
-args = parser.parse_args()
-
-gvar = DopplerVars(args.gnup)
-# }}} argument parser
-
-
 # {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
     """Gets the index for accessing legendre polynomials
@@ -120,57 +106,10 @@ def gen_leg_x(lmax, x):
 def inv_SVD(A, svdlim):
     u, s, v = np.linalg.svd(A, full_matrices=False)
     sinv = s**-1
-    '''
-    plt.figure()
-    plt.semilogy(sinv, '.')
-    plt.axhline(y=svdlim)
-    plt.title("Singular values")
-    plt.show()
-    '''
     sinv[sinv/sinv[0] > svdlim] = 0.0  # svdlim
     return np.dot(v.transpose().conjugate(),
                   np.dot(np.diag(sinv), u.transpose().conjugate()))
 # }}} inv_SVD(A, svdlim)
-
-
-# {{{ def get_daylist(args, total_days):
-def get_daylist(args, total_days):
-    """Get the list of images that needbe processed
-
-    Parameters:
-    -----------
-    args - argument parser object
-        contains arguments passed during execution of program
-    total_days - int
-        total number of images present locally
-
-    Returns:
-    --------
-    daylist - np.ndarray(ndim=1, dtype=np.int)
-        list of image numbers
-
-    """
-    # ---- if submitted as pbsdsh job ----
-    if args.job:
-        try:
-            procid = int(os.environ['PBS_VNODENUM'])
-        except KeyError:
-            pass
-        nproc = 6
-        print(f" procid = {procid}")
-        daylist = np.arange(procid, total_days, nproc)
-    # --- if submitted as a gnup input file ---
-    elif args.gnup:
-        daylist = np.array([args.gnup])
-        if args.gnup > total_days:
-            print(f" Invalid argument for --gnup {args.gnup} . Must be " +
-                  f" less than {total_days}")
-            exit()
-    # --- if computed as a script from terminal ---
-    else:
-        daylist = np.arange(0, 2)
-    return daylist
-# }}} get_daylist(args, total_days)
 
 
 class HmiClass():
