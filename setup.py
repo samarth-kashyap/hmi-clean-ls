@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     use_scm_version=True,
-    name="hmi_clean",
+    name="hmiSurfCon",
     packages=find_packages(where="src"),
-    package_dir={""},
+    package_dir={"", "src"},
 )

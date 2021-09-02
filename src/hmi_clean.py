@@ -283,7 +283,6 @@ class HmiClass():
         im_arr[1, :] = dt_pl_theta[3, :] * lp
         im_arr[2, :] = dt_pl_theta[5, :] * lp
 
-        #  im_arr[3, :] = dt_pl_theta[0, :] * lt
         im_arr[3, :] = dt_pl_theta[2, :] * lt
         im_arr[4, :] = dt_pl_theta[4, :] * lt
 
@@ -335,42 +334,3 @@ class HmiClass():
         self.map_data[self.mask_nan] -= new_img_arr
         return None
     # }}} remove_large_features(self)
-
-
-if __name__ == "__main__":
-    # {{{ directories
-    plot_dir = gvar.get_dir("plot")
-    hmi_data_dir = gvar.get_dir("hmidata")
-    hmi_data_fnames = hmi_data_dir + "HMI_2018_filenames"
-    print("Program started -- reading files")
-    print(f" HMI data fnames = {hmi_data_fnames}")
-    # }}} dirs
-
-    # 1. Reading HMI Dopplergrams
-    t1 = time.time()
-    with open(hmi_data_fnames, mode="r") as f:
-        hmi_files = f.read().splitlines()
-
-    total_days = len(hmi_files)
-    daylist = get_daylist(args, total_days)
-    print(f"Total days = {total_days}")
-
-    # 2. Creating SunPy maps
-    for day in daylist:
-        print("### 1. Initializing")
-        dop_img = HmiClass(hmi_data_dir, hmi_files[day], day)
-        print("### 2. Getting satellite velocity")
-        dop_img.get_sat_vel()
-        print("### 3. Removing effect of satellite velocity")
-        dop_img.remove_sat_vel()
-        print("### 4. Removing gravitational redshift")
-        dop_img.remove_grav_redshift()
-        print("### 5. Removing large scale features")
-        dop_img.remove_large_features()
-        print("### 6. Saving processed data")
-
-        dop_img.save_theta_phi()
-        dop_img.save_theta_phi_DC()
-        dop_img.save_map_data()
-    t2 = time.time()
-    print(f"Total time taken = {(t2-t1)/60:5.2f} minutes")
