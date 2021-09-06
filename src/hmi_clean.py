@@ -13,6 +13,13 @@ import time
 import os
 # }}} imports
 
+__all__ = ["get_pleg_index",
+           "gen_leg",
+           "gen_leg_x",
+           "inv_SVD",
+           "HmiClass"]
+__author__ "Samarth G Kashyap"
+
 # {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
     """Gets the index for accessing legendre polynomials
@@ -113,9 +120,7 @@ def inv_SVD(A, svdlim):
 
 
 class HmiClass():
-    """Class to handle mi maps and their coordinates
-
-    """
+    """Class to handle mi maps and their coordinates"""
     # {{{ def __init__(self, hmi_data_dir, hmi_file, day):
     def __init__(self, hmi_data_dir, hmi_file, day):
         print(f"Loading {hmi_file}")
@@ -158,6 +163,8 @@ class HmiClass():
         rho = np.sqrt(self.coords_hc_x**2 + self.coords_hc_y**2)
         psi = np.arctan2(self.coords_hc_y, self.coords_hc_x)
         ph = np.zeros(psi.shape) * u.rad
+
+        # range of ph; 0 < ph < 2\pi
         ph[psi < 0] = psi[psi < 0] + (2*pi)*u.rad
         ph[~(psi < 0)] = psi[~(psi < 0)]
         th = np.arcsin(rho/self.rsun_meters)
@@ -191,6 +198,8 @@ class HmiClass():
 
     # {{{ def get_sat_vel(self):
     def get_sat_vel(self):
+        """Obtain the velocity components of the satellite
+        by reading the FITS header file."""
         map_fits = fits.open(self.fname)
         map_fits.verify('fix')
         vx = map_fits[1].header['OBS_VR']
@@ -204,21 +213,27 @@ class HmiClass():
 
     # {{{ def remove_grav_redshift(self):
     def remove_grav_redshift(self):
+        """Removing the effect of gravitation red-shift. It is a 
+        DC shift between the solar surface and the observer"""
         self.map_data -= 632
     # }}} remove_grav_redshift(self)
 
     # {{{ def remove_sat_vel(self, method):
     def remove_sat_vel(self, method=2):
+        """Removing the satellite velocity from the observed image.
+        This is computed using two different methods and both 
+        give the same result (nearly). 
+        """
         self.get_sat_vel()
         if method == 1:
-            # thetaHGC = self.HGF.lat.copy()  # + 90*u.deg
-            # phiHGC = self.HGF.lon.copy()
             thHG1 = self.lat[self.mask_nan]
             phHG1 = self.lon[self.mask_nan]
 
             ct, st = np.cos(thHG1), np.sin(thHG1)
             cp, sp = np.cos(phHG1), np.sin(phHG1)
 
+            # getting velocity components in (r, theta, phi) directions
+            # given by (vr1, vt1, vp1)
             vr1 = cp*st*self.sat_VX + sp*st*self.sat_VY + ct*self.sat_VZ
             vt1 = cp*ct*self.sat_VX + sp*ct*self.sat_VY - st*self.sat_VZ
             vp1 = -sp*self.sat_VX + cp*self.sat_VY
@@ -230,6 +245,7 @@ class HmiClass():
             lt = sB0*st - cB0*ct*cp
             lp = cB0*sp
 
+            # the LoS velocity = l \cdot v
             vC1 = lr*vr1 + lt*vt1 + lp*vp1
             velCorr = np.zeros((4096, 4096))
             velCorr[self.mask_nan] = vC1
@@ -246,7 +262,7 @@ class HmiClass():
             vr3 = -self.sat_VN*ssig*cchi
             vC1 = vr1 + vr2 + vr3
             velCorr = np.zeros((4096, 4096))
-            velCorr[self.mask_nan] = vC1[self.mask_nan]  # + 632
+            velCorr[self.mask_nan] = vC1[self.mask_nan]
             velCorr[~self.mask_nan] = np.nan
 
         self.map_data += velCorr
@@ -255,6 +271,9 @@ class HmiClass():
 
     # {{{ def remove_large_features(self):
     def remove_large_features(self):
+        """Removal of differential rotation, meridional circulation
+        and limb-shift from the image.
+        """
         lat = self.lat + 90*u.deg
         lon = self.lon
         cB0 = np.cos(self.B0)
@@ -279,13 +298,18 @@ class HmiClass():
         lp = cB0 * sp
         im_arr = np.zeros((11, lt.shape[0]))
         A = np.zeros((11, 11))
+        # differential rotation (axisymmetric feature; s = 1, 3, 5)
         im_arr[0, :] = dt_pl_theta[1, :] * lp
         im_arr[1, :] = dt_pl_theta[3, :] * lp
         im_arr[2, :] = dt_pl_theta[5, :] * lp
 
+        # meridional circulation (axisymmetric feature; s = 2, 4)
         im_arr[3, :] = dt_pl_theta[2, :] * lt
         im_arr[4, :] = dt_pl_theta[4, :] * lt
 
+        # limb-shift
+        # axisymmetric feature (frame=pole at disk-center)
+        # s = 0-5
         im_arr[5, :] = pl_rho[0, :]
         im_arr[6, :] = pl_rho[1, :]
         im_arr[7, :] = pl_rho[2, :]
@@ -309,27 +333,10 @@ class HmiClass():
         print(f"Rotation = {fit_params[:3]/2/pi/0.695} Hz")
         new_img_arr = fit_params.dot(im_arr)
 
-        if args.plot_fits:
-            new1 = fit_params[:3].dot(im_arr[:3, :])
-            new2 = fit_params[3:5].dot(im_arr[3:5, :])
-            new3 = fit_params[5:].dot(im_arr[5:, :])
-
-            plt.figure(figsize=(10, 10))
-            plt.subplot(221)
-            im = plt.imshow(new1, cmap='seismic')
-            plt.title("Rotation")
-            plt.colorbar(im)
-
-            plt.subplot(222)
-            im = plt.imshow(new2, cmap='seismic')
-            plt.title("Meridional circulation")
-            plt.colorbar(im)
-
-            plt.subplot(223)
-            im = plt.imshow(new3, cmap='seismic')
-            plt.colorbar(im)
-            plt.title("Limb shift")
-            plt.show()
+        # getting individual feature maps
+        # diff_rot = fit_params[:3].dot(im_arr[:3, :])
+        # meridional_circ = fit_params[3:5].dot(im_arr[3:5, :])
+        # limb_shift = fit_params[5:].dot(im_arr[5:, :])
 
         self.map_data[self.mask_nan] -= new_img_arr
         return None
