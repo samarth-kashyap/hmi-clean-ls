@@ -2,7 +2,7 @@
 from pyshtools import legendre as pleg
 from sunpy.coordinates import frames
 from sunpy.map import Map as spMap
-from globalvars import DopplerVars
+from .globalvars import DopplerVars
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import astropy.units as u
@@ -18,7 +18,7 @@ __all__ = ["get_pleg_index",
            "gen_leg_x",
            "inv_SVD",
            "HmiClass"]
-__author__ "Samarth G Kashyap"
+__author__ = "Samarth G Kashyap"
 
 # {{{ def get_pleg_index(l, m):
 def get_pleg_index(l, m):
@@ -128,7 +128,10 @@ class HmiClass():
         self.rsun_rel = 200
 
         self.fname = hmi_data_dir + hmi_file
-        hmi_map = spMap(self.fname)
+        data, header = fits.getdata(self.fname, header=True)
+        if sum([key=='CUNIT1' for key in header.keys()])==0: header['CUNIT1'] = 'arcsec'
+        if sum([key=='CUNIT2' for key in header.keys()])==0: header['CUNIT2'] = 'arcsec'
+        hmi_map = spMap(data, header)
         self.rsun_meters = hmi_map.rsun_meters
         self.B0 = hmi_map.observer_coordinate.lat
         self.P0 = hmi_map.observer_coordinate.lon
